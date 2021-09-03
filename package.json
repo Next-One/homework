@@ -2,10 +2,10 @@
   "name": "homework",
   "version": "1.0.0",
   "description": "geek homework",
-  "main": "./src/0109/server.js",
+  "main": "src/week01/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "run": "node ./src/0109/server.js"
+    "run": "node src/week01/server.js"
   },
   "author": "",
   "license": "ISC",
