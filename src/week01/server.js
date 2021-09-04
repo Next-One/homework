@@ -5,12 +5,13 @@ const server = http.createServer((req, res) => {
 	req.on('error', (err) => {
 		console.error(err);
 	}).on('data', (chunk) => {
+		console.log('data', chunk.toString())
 		body.push(chunk);
 	}).on('end', () => {
 		body = Buffer.concat(body).toString();
 		console.log('body',body);
 		res.writeHead(200, {'Content-Type': 'text/html'})
-		res.end('<meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><h1>wmx的服务器</h1>')
+		res.end('hello world\r')
 	});
 })
 
