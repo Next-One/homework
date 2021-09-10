@@ -155,13 +155,49 @@ function getCurrentAttributes() {
 
 
 function doubleQuotedAttributeValue(c) {
+	if(c === '"'){
+		const attributes = getCurrentAttributes()
+		attributes[currentAttribute.name] = currentAttribute.value
+		return beforeAttributeName
+	}else if(c === '/'){
+		const attributes = getCurrentAttributes()
+		attributes[currentAttribute.name] = currentAttribute.value
+		return selfClosingStartTag
+	}else if(c === '>'){
+		const attributes = getCurrentAttributes()
+		attributes[currentAttribute.name] = currentAttribute.value
+		emit(currentToken)
+		return data
+	}else if(c === '\u0000'){
 
+	}else {
+		currentAttribute.value += c
+		return doubleQuotedAttributeValue
+	}
 }
 
 
 
 function singleQuotedAttributeValue(c) {
+	if(c === '\''){
+		const attributes = getCurrentAttributes()
+		attributes[currentAttribute.name] = currentAttribute.value
+		return beforeAttributeName
+	}else if(c === '/'){
+		const attributes = getCurrentAttributes()
+		attributes[currentAttribute.name] = currentAttribute.value
+		return selfClosingStartTag
+	}else if(c === '>'){
+		const attributes = getCurrentAttributes()
+		attributes[currentAttribute.name] = currentAttribute.value
+		emit(currentToken)
+		return data
+	}else if(c === '\u0000'){
 
+	}else {
+		currentAttribute.value += c
+		return singleQuotedAttributeValue
+	}
 }
 
 
