@@ -3,13 +3,27 @@
     <meta charset="UTF-8"/>
     <title>index</title>
     <style>
-        .title{
+
+        #box .title{
             font-family: "Arial Black",serif;
+            background: #345678;
+        }
+
+        #h1 {
+            background: red;
+        }
+
+        body #box #input{
+            width: 200px;
+            height: 50px;
+            background: #eee;
         }
     </style>
 </head>
 <body>
-<h1 class="title">汪明喜的测试page wmx</h1>
-<input type="password"/>
+<div id="box">
+    <h1 class="title" id="h1">汪明喜的测试page wmx</h1>
+    <input id="input" type="password"/>
+</div>
 </body>
 </html>

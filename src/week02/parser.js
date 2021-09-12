@@ -1,18 +1,163 @@
 const EOF = Symbol('EOF')
+const css = require('css')
 const LetterReg = /^[a-zA-Z1-6]$/
 const BlankReg = /^[\n\r\f ]$/
 
 let currentToken = null
 let currentAttribute = null
+let currentTextNode = null
+let stack = [{type: 'document', children: []}]
+let rules = []
+
+function specificity(selector) {
+	const p = [0,0,0,0]
+	const selectorParts = selector.split(' ')
+	for (const part of selectorParts) {
+		if(part[0] === '#'){
+			p[1]++
+		}else if(part[0] === '.'){
+			p[2]++
+		}else {
+			p[3]++
+		}
+	}
+	return p
+}
+
+function compare(sp1, sp2) {
+	if(sp1[0] - sp2[0]){
+		return sp1[0] - sp2[0]
+	}
+	if(sp1[1] - sp2[1]){
+		return sp1[1] - sp2[1]
+	}
+	if(sp1[2] - sp2[2]){
+		return sp1[2] - sp2[2]
+	}
+	return sp1[3] - sp2[3]
+}
+
+function addCssRules(text) {
+	const ast = css.parse(text)
+	rules.push(...ast.stylesheet.rules)
+}
+
+function match(element, selector) {
+	if(!element.attributes || !selector) return false
+	if(selector.charAt(0) === '#'){
+		const value = selector.substring(1)
+		for (const attr of element.attributes) {
+			if(attr.name === 'id' && attr.value === value){
+				return true
+			}
+		}
+	}else if(selector.charAt(0) === '.'){
+		const value = selector.substring(1)
+		for (const attr of element.attributes) {
+			const classList = attr.value.split(/\s+/)
+			if(attr.name === 'class' && classList.includes(value)){
+				return true
+			}
+		}
+	}else if(selector === element.tagName){
+		return true
+	}
+	return false
+}
+
+function computedCss(element) {
+	const elements = stack.slice().reverse()
+	if (!element.computedStyle) element.computedStyle = {}
+	for (const rule of rules) {
+		let selectorParts = rule.selectors[0].split(' ').reverse()
+		if (!match(element, selectorParts[0])) {
+			continue
+		}
+		let matched = false
+		let j = 1
+		for (let i = 0; i < elements.length; i++) {
+			if(match(elements[i], selectorParts[j])){
+				j++
+			}
+		}
+		if(j >= selectorParts.length){
+			matched = true
+		}
+		if(matched){
+			const sp = specificity(rule.selectors[0])
+			const computedStyle = element.computedStyle
+			for (const declaration of rule.declarations) {
+				// computedStyle[declaration.property] = declaration.value
+				let property = computedStyle[declaration.property]
+				if(!property) property = computedStyle[declaration.property] = {}
+				if(!property.specificity) {
+					property.specificity = sp
+					property.value = declaration.value
+				}else if(compare(property.specificity, sp) < 0){
+					property.specificity = sp
+					property.value = declaration.value
+				}
+			}
+			console.log(computedStyle)
+		}
+	}
+}
 
 function emit(token) {
-	if(token.type !== 'text') console.log(token)
+	let top = stack[stack.length - 1]
+	if (token.type === 'startTag') {
+		let element = {
+			type: 'element',
+			children: [],
+			attributes: []
+		}
+		element.tagName = token.tagName
+		if (token.attributes) {
+			for (const [key, value] of Object.entries(token.attributes)) {
+				element.attributes.push({
+					name: key,
+					value
+				})
+			}
+		}
+		// 计算css
+		computedCss(element)
+		// 对偶操作
+		top.children.push(element)
+		element.parent = top
+
+		if (!token.isSelfClosing) {
+			stack.push(element)
+		}
+		currentTextNode = null
+	} else if (token.type === 'endTag') {
+		if (token.tagName !== top.tagName) {
+			throw new Error(`Tag start ${top.tagName} end ${token.tagName} doesn't match`)
+		} else {
+			if (top.tagName === 'style') {
+				addCssRules(top.children[0].content)
+			}
+			stack.pop()
+		}
+		currentTextNode = null
+	} else if (token.type === 'text') {
+		if (currentTextNode == null) {
+			currentTextNode = {
+				type: 'text',
+				content: ''
+			}
+			top.children.push(currentTextNode)
+		}
+		currentTextNode.content += token.content
+	}
 }
+
 
 function data(c) {
 	if (c === '<') {
 		return tagOpen
 	} else if (c === EOF) {
+		console.log(stack)
 		emit({
 			type: 'EOF'
 		})
@@ -61,7 +206,6 @@ function endTagOpen(c) {
 
 function tagName(c) {
 	if (c.match(BlankReg)) {
-		emit(currentToken)
 		return beforeAttributeName
 	} else if (c === '/') {
 		return selfClosingStartTag
@@ -77,30 +221,30 @@ function tagName(c) {
 }
 
 function selfClosingStartTag(c) {
-	if (c === '>'){
+	if (c === '>') {
 		currentToken.isSelfClosing = true
 		emit(currentToken)
 		return data
-	}else if(c === EOF){
+	} else if (c === EOF) {
 		emit({
 			type: 'EOF'
 		})
 		return
-	}else {
+	} else {
 
 	}
 }
 
 function beforeAttributeName(c) {
-	if(c.match(BlankReg)){
+	if (c.match(BlankReg)) {
 		return beforeAttributeName
-	}else if(c === '>' || c === '/' || c === EOF){
+	} else if (c === '>' || c === '/' || c === EOF) {
 		return data
-	}else if(c === '='){
+	} else if (c === '=') {
 		return beforeAttributeName
-	}else if(c === '/'){
+	} else if (c === '/') {
 		return selfClosingStartTag
-	}else {
+	} else {
 		currentAttribute = {
 			name: '',
 			value: ''
@@ -111,16 +255,16 @@ function beforeAttributeName(c) {
 
 
 function attributeName(c) {
-	if(c.match(BlankReg) || c === '/' || c === '>' || c === EOF){
+	if (c.match(BlankReg) || c === '/' || c === '>' || c === EOF) {
 		return afterAttributeName(c)
-	}else if(c === '='){
+	} else if (c === '=') {
 		return beforeAttributeValue
-	}else if(c === '\u0000'){
+	} else if (c === '\u0000') {
 
-	}else if(c === '"' || c === '\'' || c === '<'){
+	} else if (c === '"' || c === '\'' || c === '<') {
 
-	}else {
-		currentAttribute.name+=c
+	} else {
+		currentAttribute.name += c
 		return attributeName
 	}
 }
@@ -131,23 +275,22 @@ function afterAttributeName(c) {
 }
 
 
-
 function beforeAttributeValue(c) {
-	if(c.match(BlankReg) || c === '/' || c === '>' || c === EOF){
+	if (c.match(BlankReg) || c === '/' || c === '>' || c === EOF) {
 		return beforeAttributeValue
-	}else if(c === '"'){
+	} else if (c === '"') {
 		return doubleQuotedAttributeValue
-	}else if(c === '\''){
+	} else if (c === '\'') {
 		return singleQuotedAttributeValue
-	}else if(c === '>'){
+	} else if (c === '>') {
 
-	}else {
+	} else {
 		return unquotedAttributeValue(c)
 	}
 }
 
 function getCurrentAttributes() {
-	if(!currentToken.attributes){
+	if (!currentToken.attributes) {
 		currentToken.attributes = {}
 	}
 	return currentToken.attributes
@@ -155,28 +298,27 @@ function getCurrentAttributes() {
 
 
 function doubleQuotedAttributeValue(c) {
-	if(c === '"'){
+	if (c === '"') {
 		const attributes = getCurrentAttributes()
 		attributes[currentAttribute.name] = currentAttribute.value
 		return afterQuotedAttributeValue
-	}else if(c === '\u0000'){
+	} else if (c === '\u0000') {
 
-	}else {
+	} else {
 		currentAttribute.value += c
 		return doubleQuotedAttributeValue
 	}
 }
 
 
-
 function singleQuotedAttributeValue(c) {
-	if(c === '\''){
+	if (c === '\'') {
 		const attributes = getCurrentAttributes()
 		attributes[currentAttribute.name] = currentAttribute.value
 		return afterQuotedAttributeValue
-	}else if(c === '\u0000'){
+	} else if (c === '\u0000') {
 
-	}else {
+	} else {
 		currentAttribute.value += c
 		return singleQuotedAttributeValue
 	}
@@ -184,22 +326,22 @@ function singleQuotedAttributeValue(c) {
 
 
 function unquotedAttributeValue(c) {
-	if(c.match(BlankReg)){
+	if (c.match(BlankReg)) {
 		const attributes = getCurrentAttributes()
 		attributes[currentAttribute.name] = currentAttribute.value
 		return beforeAttributeName
-	}else if(c === '/'){
+	} else if (c === '/') {
 		const attributes = getCurrentAttributes()
 		attributes[currentAttribute.name] = currentAttribute.value
 		return selfClosingStartTag
-	}else if(c === '>'){
+	} else if (c === '>') {
 		const attributes = getCurrentAttributes()
 		attributes[currentAttribute.name] = currentAttribute.value
 		emit(currentToken)
 		return data
-	}else if(c === '\u0000'){
+	} else if (c === '\u0000') {
 
-	}else {
+	} else {
 		currentAttribute.value += c
 		return unquotedAttributeValue
 	}
@@ -207,18 +349,18 @@ function unquotedAttributeValue(c) {
 
 
 function afterQuotedAttributeValue(c) {
-	if(c.match(BlankReg)){
+	if (c.match(BlankReg)) {
 		return beforeAttributeName
-	}else if(c === '/'){
+	} else if (c === '/') {
 		return selfClosingStartTag
-	}else if(c === '>'){
+	} else if (c === '>') {
 		const attributes = getCurrentAttributes()
 		attributes[currentAttribute.name] = currentAttribute.value
 		emit(currentToken)
 		return data
-	}else if(c === '\u0000'){
+	} else if (c === '\u0000') {
 
-	}else {
+	} else {
 		return beforeAttributeName(c)
 	}
 }
@@ -230,10 +372,10 @@ function afterAttributeValue(c) {
 
 
 module.exports = function parserHTML(html) {
-	console.log(html,'html')
 	let state = data
 	for (const c of html) {
 		state = state(c)
 	}
 	state = state(EOF)
+	return stack[0]
 }

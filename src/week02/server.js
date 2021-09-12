@@ -1,17 +1,13 @@
 const http = require('http')
 const {open} = require('fs/promises')
 
-let htmlData = null
-
-
 
 async function getIndexHtmlData(file = './src/week02/index.html') {
-	// if(htmlData) return htmlData 不缓存index数据，每次拿最新的
 	let fileHandler
 	try{
 		fileHandler = await open(file, 'r')
-		const data = await fileHandler.read()
-		return htmlData = data.buffer
+		const {buffer,bytesRead} = await fileHandler.read()
+		return buffer.slice(0, bytesRead)
 	}finally {
 		if(fileHandler) await fileHandler.close()
 	}
@@ -32,5 +28,5 @@ const server = http.createServer((req, res) => {
 })
 
 server.listen('8010',() => {
-	console.log('server listen on 8010')
+	console.log('server listen on 8010, 请注意，该代码运行环境必须是node15以上！！！')
 })

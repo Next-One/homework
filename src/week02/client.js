@@ -228,5 +228,6 @@ void async function () {
 	})
 
 	const response = await request.send()
-	parser(response.body)
+	const dom = parser(response.body)
+	console.log(dom)
 }()
