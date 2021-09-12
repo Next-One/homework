@@ -112,7 +112,7 @@ function beforeAttributeName(c) {
 
 function attributeName(c) {
 	if(c.match(BlankReg) || c === '/' || c === '>' || c === EOF){
-		return afterAttributeName
+		return afterAttributeName(c)
 	}else if(c === '='){
 		return beforeAttributeValue
 	}else if(c === '\u0000'){
@@ -142,7 +142,7 @@ function beforeAttributeValue(c) {
 	}else if(c === '>'){
 
 	}else {
-		return unquotedAttributeValue
+		return unquotedAttributeValue(c)
 	}
 }
 
@@ -158,16 +158,7 @@ function doubleQuotedAttributeValue(c) {
 	if(c === '"'){
 		const attributes = getCurrentAttributes()
 		attributes[currentAttribute.name] = currentAttribute.value
-		return beforeAttributeName
-	}else if(c === '/'){
-		const attributes = getCurrentAttributes()
-		attributes[currentAttribute.name] = currentAttribute.value
-		return selfClosingStartTag
-	}else if(c === '>'){
-		const attributes = getCurrentAttributes()
-		attributes[currentAttribute.name] = currentAttribute.value
-		emit(currentToken)
-		return data
+		return afterQuotedAttributeValue
 	}else if(c === '\u0000'){
 
 	}else {
@@ -182,16 +173,7 @@ function singleQuotedAttributeValue(c) {
 	if(c === '\''){
 		const attributes = getCurrentAttributes()
 		attributes[currentAttribute.name] = currentAttribute.value
-		return beforeAttributeName
-	}else if(c === '/'){
-		const attributes = getCurrentAttributes()
-		attributes[currentAttribute.name] = currentAttribute.value
-		return selfClosingStartTag
-	}else if(c === '>'){
-		const attributes = getCurrentAttributes()
-		attributes[currentAttribute.name] = currentAttribute.value
-		emit(currentToken)
-		return data
+		return afterQuotedAttributeValue
 	}else if(c === '\u0000'){
 
 	}else {
@@ -224,12 +206,31 @@ function unquotedAttributeValue(c) {
 }
 
 
+function afterQuotedAttributeValue(c) {
+	if(c.match(BlankReg)){
+		return beforeAttributeName
+	}else if(c === '/'){
+		return selfClosingStartTag
+	}else if(c === '>'){
+		const attributes = getCurrentAttributes()
+		attributes[currentAttribute.name] = currentAttribute.value
+		emit(currentToken)
+		return data
+	}else if(c === '\u0000'){
+
+	}else {
+		return beforeAttributeName(c)
+	}
+}
+
+
 function afterAttributeValue(c) {
 
 }
 
 
 module.exports = function parserHTML(html) {
+	console.log(html,'html')
 	let state = data
 	for (const c of html) {
 		state = state(c)
