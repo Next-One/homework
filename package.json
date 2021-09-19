@@ -4,8 +4,8 @@
   "description": "geek homework",
   "main": "src/week01/server.js",
   "scripts": {
-    "runServer": "node src/week02/server.js",
-    "runClient": "node src/week02/client.js"
+    "runServer": "node src/week03/server.js",
+    "runClient": "node src/week03/client.js"
   },
   "author": "",
   "license": "ISC",
@@ -14,3 +14,4 @@
     "node": "^16.3.0"
   }
 }
+
